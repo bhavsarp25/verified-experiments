@@ -111,6 +111,16 @@ def test_new_file_under_a_protected_dir_is_tamper(tmp_path):
     assert not boundaries.changed_protected(root).clean
 
 
+def test_build_artifacts_are_not_tamper(tmp_path):
+    """Compiled bytecode and caches under a protected dir are not tamper, even
+    with no .gitignore. Only source changes to protected files count."""
+    root = _fake_harness(tmp_path)
+    os.makedirs(os.path.join(root, "guards", "__pycache__"))
+    open(os.path.join(root, "guards", "__pycache__", "leakage.cpython-314.pyc"), "w").close()
+    open(os.path.join(root, "guards", "stray.pyc"), "w").close()
+    assert boundaries.changed_protected(root).clean
+
+
 def test_revert_restores_a_tampered_guard(tmp_path):
     root = _fake_harness(tmp_path)
     guard = os.path.join(root, "guards", "leakage.py")

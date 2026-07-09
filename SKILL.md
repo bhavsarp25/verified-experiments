@@ -113,23 +113,33 @@ next action. The mapping from failures to plain-language causes is itself guarde
 by D1 meta-tests (`tests/test_diagnose.py`): feed the diagnoser a known fake and
 it must not report DONE.
 
-## Agentic mode (safety core built, loop pending)
+## Agentic mode (checkpoint loop built)
 
 There is an optional path where an agent runs the guards, reads the diagnosis,
 and fixes its own fakes. The guards stay the enforced boundary: the agent may
 write only pipeline code, and can never edit a guard, a test, the reviewer, or
-the diagnoser to make the gate pass.
+the diagnoser to make the gate pass. The only way to green is fixing real code.
 
-The safety core exists today in `agent/`:
-- `agent/boundaries.py` decides which paths are writable (deny by default) and
-  runs the tamper meta-gate: if any protected file changes, the run aborts.
-- `agent/permissions.py` is the Edit/Write/Bash hook that enforces the same
-  fence at the tool layer.
-- `agent/contract.md` is the boundary the agent is told, word for word.
+The full loop lives in `agent/`:
+- `agent/boundaries.py` (the fence): decides which paths are writable (deny by
+  default, traversal-safe) and runs the tamper meta-gate. If any protected
+  source file changes, the run aborts and reverts. Build artifacts (`.pyc`,
+  `__pycache__`) never count as tamper.
+- `agent/permissions.py`: the Edit/Write/Bash hook that enforces the same fence
+  at the tool layer.
+- `agent/contract.md`: the boundary the agent is told, word for word.
+- `agent/loop.py`: the checkpoint fix loop. It reads `diagnose.py --json`, picks
+  one finding, forms a plan, asks a human at the checkpoint, applies the fix in
+  a writable file only, re-runs, and enforces the tamper gate and a run budget
+  every iteration. Terminal outcomes: DONE, NEEDS_CONTEXT, STOPPED_BY_HUMAN,
+  BLOCKED_BY_FENCE, TAMPER, ESCALATED.
+- `agent/run.py`: the human CLI entry. Wiring the live edit step to a model (the
+  SDK fixer) is the one remaining piece, deferred to phase 3b; the loop, fence,
+  budget, and checkpoint are done and tested end to end.
 
-The autonomous loop that drives this (`agent/run.py`) is not built yet. See
-[docs/agentic-scope.md](docs/agentic-scope.md) for the full design and the
-build phases. Until the loop lands, use the manual investigate loop above.
+Run it with `make agent`. See [docs/agentic-scope.md](docs/agentic-scope.md) for
+the design and remaining work. You can still use the manual investigate loop
+above at any time.
 
 ## Adapting to a domain
 

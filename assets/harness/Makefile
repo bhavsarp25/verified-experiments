@@ -35,6 +35,13 @@ diagnose:
 diagnose-outputs:
 	$(PY) diagnose.py --outputs results
 
+# Agentic mode: the checkpoint fix loop. Reads diagnose.py --json, proposes a
+# fix per finding, asks before editing, and can only write pipeline code. The
+# live model-driven edit step (SDK fixer) is phase 3b; see docs/agentic-scope.md.
+.PHONY: agent
+agent:
+	$(PY) agent/run.py
+
 # T1 (added next): frozen decoder session1 -> session2 drift chart.
 .PHONY: t1
 t1:

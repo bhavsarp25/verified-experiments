@@ -417,11 +417,13 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description="Systematic diagnosis + STATUS report for the guard harness (gstack-style)."
     )
-    # Default scope is the pipeline code (guards + provenance), matching the
-    # Makefile `review` target. Meta-tooling that has to name the fake patterns
-    # (reviewer.py, diagnose.py, tests, fixtures) is excluded by the same
-    # convention the gate already uses, so it does not false-flag itself.
-    ap.add_argument("--paths", nargs="*", default=["guards", "provenance"],
+    # Default scope: the guard/provenance harness code plus the project's
+    # pipeline code (the code an agent is allowed to fix). A missing pipeline/
+    # dir is skipped by the reviewer, so this is safe in a bare harness. Meta
+    # tooling that has to name the fake patterns (reviewer.py, diagnose.py,
+    # tests, fixtures) is excluded by the same convention the gate uses, so it
+    # does not false-flag itself.
+    ap.add_argument("--paths", nargs="*", default=["guards", "provenance", "pipeline"],
                     help="code paths for the G9 reviewer")
     ap.add_argument("--outputs", help="audit produced result files in this dir instead of reviewing code")
     ap.add_argument("--exclude", nargs="*", default=("tests", "fixtures", "reviewer.py"))

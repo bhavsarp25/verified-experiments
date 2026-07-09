@@ -66,6 +66,19 @@ def harness_root() -> str:
     return os.path.dirname(here)
 
 
+# Build artifacts are never tamper. A compiled .pyc or a cache dir appearing
+# under a protected directory does not change what the harness runs (Python
+# recompiles from the .py source, which IS protected). Filtering these keeps
+# the fence robust even when a project has no .gitignore.
+_ARTIFACT_DIRS = ("__pycache__", ".pytest_cache")
+
+
+def _is_build_artifact(rel: str) -> bool:
+    if rel.endswith((".pyc", ".pyo")):
+        return True
+    return any(part in _ARTIFACT_DIRS for part in rel.split(os.sep))
+
+
 def _under(rel: str, prefix: str) -> bool:
     return rel == prefix or rel.startswith(prefix + os.sep)
 
@@ -162,6 +175,8 @@ def changed_protected(root: str) -> TamperReport:
         if abs_p != root_real and not abs_p.startswith(root_real + os.sep):
             continue  # outside the harness, not our concern
         rel = os.path.relpath(abs_p, root_real)
+        if _is_build_artifact(rel):
+            continue  # compiled bytecode / caches are not tamper
         if is_protected(rel):
             changed.append(rel)
     return TamperReport(clean=not changed, changed=sorted(changed))

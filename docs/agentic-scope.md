@@ -1,7 +1,8 @@
 # Agentic verified-experiments: scope
 
-Status: phase 2 (safety core) built and green. Phases 1, 3, 4 pending. Decisions
-locked below.
+Status: phases 1, 2, 3 built and green; phase 4 verified end to end. The only
+remaining work is phase 3b, wiring the live model-driven fixer. Decisions locked
+below.
 
 Today the harness is guardrails an agent can read. This scopes the next step: a
 self-checking agent that runs the guardrails, reads the diagnosis, fixes its own
@@ -137,16 +138,25 @@ that asserts the agent cannot reach DONE by editing a guard.
 
 ## Build phases
 
-1. `diagnose.py --json` plus the structured `diagnose` tool. (pending)
+1. `diagnose.py --json` plus the structured contract. **DONE.** `--json` emits
+   status + findings; text output unchanged; `tests/test_diagnose_json.py`.
+   Default scan scope now includes `pipeline/` so the loop sees the code it fixes.
 2. `boundaries.py` plus `permissions.py` plus the meta-gate, with their tests.
-   This is the safety core and lands before any autonomy. **DONE.** 22 boundary
-   meta-tests, reviewer clean, `make gate` green. `agent/boundaries.py`,
-   `agent/permissions.py`, `agent/contract.md`, `tests/test_boundaries.py`.
-3. `agent/run.py`: the loop, budgets, escalation, checkpoint gate, DONE and STOP
-   handling. (pending; `RunBudget` primitive already lives in `boundaries.py`.)
-4. Dogfood: plant a known fake in a sample pipeline, watch the agent propose the
-   fix, approve it at the checkpoint, and confirm it stops at green without
-   touching the fence. (pending)
+   The safety core, lands before any autonomy. **DONE.** 23 boundary meta-tests,
+   reviewer clean, `make gate` green. Build artifacts (`.pyc`, `__pycache__`)
+   are excluded from the tamper check so the fence is robust without a gitignore.
+3. `agent/loop.py` plus `agent/run.py`: the loop, budgets, escalation, checkpoint
+   gate, and all terminal outcomes. **DONE.** 12 loop meta-tests, injected deps
+   so it is testable with no live model. `RunBudget` lives in `boundaries.py`.
+4. Dogfood: plant a known fake in a `pipeline/`, confirm `diagnose.py --json`
+   reports BLOCKED, run the real loop wired to the real diagnose output plus a
+   real fixer, and confirm DONE without touching the fence. **DONE end to end.**
+   Result: outcome DONE in 2 iterations, the hardcoded metric removed, zero
+   protected files touched. This run also caught and fixed the artifact-vs-tamper
+   bug in phase 2.
+
+Remaining: phase 3b, wire the live model-driven fixer (the Claude Agent SDK)
+into `agent/run.py` in place of the NotImplementedError placeholder.
 
 ## Open items for later
 
