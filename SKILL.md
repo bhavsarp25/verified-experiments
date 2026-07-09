@@ -99,12 +99,12 @@ the whole run.
 
 **The STATUS you report** is one of:
 
-- **DONE** — reviewer clean and all guard meta-tests pass. Safe to proceed.
-- **DONE_WITH_CONCERNS** — no blockers, but advisory warnings (a TODO, an
+- **DONE**: reviewer clean and all guard meta-tests pass. Safe to proceed.
+- **DONE_WITH_CONCERNS**: no blockers, but advisory warnings (a TODO, an
   unseeded RNG) to clear. List them.
-- **BLOCKED** — a reviewer error or a failing guard blocks the pipeline. State
+- **BLOCKED**: a reviewer error or a failing guard blocks the pipeline. State
   the blocker and what you tried.
-- **NEEDS_CONTEXT** — a required input is missing (for example, no results
+- **NEEDS_CONTEXT**: a required input is missing (for example, no results
   directory yet). State exactly what is needed.
 
 Each STATUS ships with REASON, ATTEMPTED, and a RECOMMENDATION, so the report
