@@ -113,6 +113,24 @@ next action. The mapping from failures to plain-language causes is itself guarde
 by D1 meta-tests (`tests/test_diagnose.py`): feed the diagnoser a known fake and
 it must not report DONE.
 
+## Agentic mode (safety core built, loop pending)
+
+There is an optional path where an agent runs the guards, reads the diagnosis,
+and fixes its own fakes. The guards stay the enforced boundary: the agent may
+write only pipeline code, and can never edit a guard, a test, the reviewer, or
+the diagnoser to make the gate pass.
+
+The safety core exists today in `agent/`:
+- `agent/boundaries.py` decides which paths are writable (deny by default) and
+  runs the tamper meta-gate: if any protected file changes, the run aborts.
+- `agent/permissions.py` is the Edit/Write/Bash hook that enforces the same
+  fence at the tool layer.
+- `agent/contract.md` is the boundary the agent is told, word for word.
+
+The autonomous loop that drives this (`agent/run.py`) is not built yet. See
+[docs/agentic-scope.md](docs/agentic-scope.md) for the full design and the
+build phases. Until the loop lands, use the manual investigate loop above.
+
 ## Adapting to a domain
 
 The harness is domain-agnostic except `assert_real_eeg`, which is a worked

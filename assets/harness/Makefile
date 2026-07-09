@@ -7,10 +7,10 @@ PY := $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 gate: review test
 	@echo "GATE PASSED: code reviewed clean + all guards green."
 
-# G9 static reviewer over the pipeline code (not the test fixtures).
+# G9 static reviewer over the pipeline + agent code (not the test fixtures).
 .PHONY: review
 review:
-	$(PY) reviewer.py guards provenance pipeline 2>/dev/null || $(PY) reviewer.py guards provenance
+	$(PY) reviewer.py guards provenance agent pipeline 2>/dev/null || $(PY) reviewer.py guards provenance agent
 
 # G8 guard meta-tests (each guard must reject a deliberate fake).
 .PHONY: test

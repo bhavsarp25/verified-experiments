@@ -1,6 +1,7 @@
 # Agentic verified-experiments: scope
 
-Status: scope approved, not built. Decisions locked below.
+Status: phase 2 (safety core) built and green. Phases 1, 3, 4 pending. Decisions
+locked below.
 
 Today the harness is guardrails an agent can read. This scopes the next step: a
 self-checking agent that runs the guardrails, reads the diagnosis, fixes its own
@@ -136,14 +137,16 @@ that asserts the agent cannot reach DONE by editing a guard.
 
 ## Build phases
 
-1. `diagnose.py --json` plus the structured `diagnose` tool.
+1. `diagnose.py --json` plus the structured `diagnose` tool. (pending)
 2. `boundaries.py` plus `permissions.py` plus the meta-gate, with their tests.
-   This is the safety core and lands before any autonomy.
+   This is the safety core and lands before any autonomy. **DONE.** 22 boundary
+   meta-tests, reviewer clean, `make gate` green. `agent/boundaries.py`,
+   `agent/permissions.py`, `agent/contract.md`, `tests/test_boundaries.py`.
 3. `agent/run.py`: the loop, budgets, escalation, checkpoint gate, DONE and STOP
-   handling.
+   handling. (pending; `RunBudget` primitive already lives in `boundaries.py`.)
 4. Dogfood: plant a known fake in a sample pipeline, watch the agent propose the
    fix, approve it at the checkpoint, and confirm it stops at green without
-   touching the fence.
+   touching the fence. (pending)
 
 ## Open items for later
 
