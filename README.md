@@ -22,9 +22,25 @@ before it enters the pipeline and after it produces output.
 | G7 Fail-loud | silent fallbacks; results without provenance |
 | G8 Meta-tests | a guard that does not actually catch its fake |
 | G9 Reviewer | fake patterns in the code itself (runs before + after) |
+| D1 Diagnoser | a red gate reported with no root cause or the wrong STATUS |
 
 Every guard ships with a test that feeds it a deliberate fake and asserts the
 guard rejects it. See [`references/guards.md`](references/guards.md) for detail.
+
+## When a gate goes red: diagnose it
+
+```bash
+make diagnose   # root-cause each finding, then print one completion STATUS
+```
+
+Instead of a raw stack trace, `make diagnose` runs the reviewer and the guard
+meta-tests, then for each failure prints which guard tripped, the file and line,
+what it means, the likely cause, and what to try. It ends with one STATUS you can
+report back: **DONE**, **DONE_WITH_CONCERNS**, **BLOCKED**, or **NEEDS_CONTEXT**,
+each with a reason, what was attempted, and a recommendation. This is the layer
+that debugs the guards and talks you through what failed and why. The failure to
+plain-language mapping is itself guarded by meta-tests, so the diagnoser can never
+call a fake run DONE.
 
 ## Use it as a library
 

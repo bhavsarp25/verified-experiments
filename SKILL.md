@@ -1,6 +1,6 @@
 ---
 name: verified-experiments
-description: Guardrails that make machine-learning and data-science results impossible to fake, hardcode, or hallucinate. Provides a tested, drop-in Python harness (provenance manifests, real-data assertions, label-leakage tripwires, sanity plus shuffled-label controls, independent metric re-computation/audit, reproducibility checks, and fail-loud/no-fabrication rules) plus a static code reviewer that runs before code enters the pipeline and after outputs are produced. Use when building, reviewing, running, or auditing any experiment, benchmark, model evaluation, training run, or data pipeline where the results must be trustworthy - especially to prevent hardcoded metric literals, silent except/fallbacks, synthetic-data substitution, train/test label leakage, or unreproducible numbers. Trigger when the user says results must be real / not faked / not hallucinated / not hardcoded, asks to verify or gate an experiment or ML pipeline, wants provenance or an audit trail on metrics, or wants a CodeRabbit-style check that catches faked results.
+description: Guardrails that make machine-learning and data-science results impossible to fake, hardcode, or hallucinate. Provides a tested, drop-in Python harness (provenance manifests, real-data assertions, label-leakage tripwires, sanity plus shuffled-label controls, independent metric re-computation/audit, reproducibility checks, and fail-loud/no-fabrication rules) plus a static code reviewer that runs before code enters the pipeline and after outputs are produced. Use when building, reviewing, running, or auditing any experiment, benchmark, model evaluation, training run, or data pipeline where the results must be trustworthy - especially to prevent hardcoded metric literals, silent except/fallbacks, synthetic-data substitution, train/test label leakage, or unreproducible numbers. Trigger when the user says results must be real / not faked / not hallucinated / not hardcoded, asks to verify or gate an experiment or ML pipeline, wants provenance or an audit trail on metrics, or wants a CodeRabbit-style check that catches faked results. Also includes a diagnose loop that root-causes any red gate and prints a plain-language completion STATUS (DONE, DONE_WITH_CONCERNS, BLOCKED, or NEEDS_CONTEXT) with a fix for each finding, so an agent can debug the guards and talk you through what failed and why.
 ---
 
 # Verified Experiments
@@ -35,13 +35,16 @@ gates the code before and after each step.
 
 3. **Run the loop before AND after every change** (this is the core habit):
    ```
-   make gate     # G9 reviewer: code is clean of fake patterns + all guards green
+   make gate      # G9 reviewer: code is clean of fake patterns + all guards green
    make audit     # post-output: every result grounded + independently recomputable
+   make diagnose  # if gate or audit is red: root-cause each failure + a STATUS report
    ```
    `make gate` exits non-zero on any fake pattern or failing guard. Nothing
    enters the pipeline until gate is green; no output is trusted until audit is
    green. The reviewer flags hardcoded metric literals, silent excepts,
-   synthetic-returning loaders, and fabricated fallbacks.
+   synthetic-returning loaders, and fabricated fallbacks. When something is red,
+   `make diagnose` turns the raw output into a plain-language root cause and one
+   STATUS you can report back (see the diagnose loop below).
 
 4. **Keep the discipline (G8).** Every guard already has a meta-test that feeds
    it a deliberate fake and asserts rejection. When adding a new guard or a
@@ -61,9 +64,54 @@ gates the code before and after each step.
 | G7 Fail-loud | `guards/fabrication.py` | silent fallbacks; results without provenance |
 | G8 Meta-tests | `tests/` | a guard that does not actually catch its fake |
 | G9 Reviewer | `reviewer.py` | fake patterns in the CODE itself (before + after) |
+| D1 Diagnoser | `diagnose.py` | a red gate reported with no root cause or wrong STATUS |
 
 For full per-guard detail, wiring examples, and the reviewer's checks, read
 [references/guards.md](references/guards.md).
+
+## Diagnosing failures: the investigate loop
+
+When `make gate` or `make audit` goes red, do not guess a fix. Run
+`make diagnose` and work the loop below. This is the layer that finds the
+issue, explains it, and gives you one line to report back.
+
+`make diagnose` runs the G9 reviewer and the G8 guard meta-tests, then prints:
+a root-cause note per finding (which guard, the file and line, what it means,
+the most likely cause, and what to try), followed by one completion STATUS for
+the whole run.
+
+**The five steps (do them in order, never skip to the fix):**
+
+1. **Reproduce.** Run `make diagnose`. Read the STATUS line first, then each
+   finding. If nothing reproduces, there is no bug to fix.
+2. **Read the exact assertion.** For a failing guard test, open the named test
+   and read what it asserts and the exception it raised. For a reviewer finding,
+   open the reported `file:line`. The `cause:` line is the likely root, not a
+   guess to act on blindly.
+3. **Isolate.** Confirm the one guard or one line responsible. One failure at a
+   time. Do not change three things and re-run.
+4. **Root cause, then fix.** Only once you can name why it failed, apply the
+   `fix:` line. Fix the code, never weaken or delete a guard to make it pass.
+   If a guard is genuinely inapplicable, remove it with a written reason (this
+   is allowed; silently loosening a threshold is not).
+5. **Re-run and report.** `make gate` and `make diagnose` again. Report the new
+   STATUS to the user in plain language.
+
+**The STATUS you report** is one of:
+
+- **DONE** — reviewer clean and all guard meta-tests pass. Safe to proceed.
+- **DONE_WITH_CONCERNS** — no blockers, but advisory warnings (a TODO, an
+  unseeded RNG) to clear. List them.
+- **BLOCKED** — a reviewer error or a failing guard blocks the pipeline. State
+  the blocker and what you tried.
+- **NEEDS_CONTEXT** — a required input is missing (for example, no results
+  directory yet). State exactly what is needed.
+
+Each STATUS ships with REASON, ATTEMPTED, and a RECOMMENDATION, so the report
+speaks to the user: what was checked, what passed, what failed and why, and the
+next action. The mapping from failures to plain-language causes is itself guarded
+by D1 meta-tests (`tests/test_diagnose.py`): feed the diagnoser a known fake and
+it must not report DONE.
 
 ## Adapting to a domain
 

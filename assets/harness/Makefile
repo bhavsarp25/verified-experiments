@@ -22,6 +22,19 @@ test:
 audit:
 	$(PY) reviewer.py --outputs results
 
+# Diagnose: run the reviewer + guard meta-tests, then print one plain-language
+# STATUS report (DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT) with a
+# root-cause note per finding. This is the gstack-style "speak to me" layer.
+# Non-zero exit on BLOCKED or NEEDS_CONTEXT so CI can gate on it too.
+.PHONY: diagnose
+diagnose:
+	$(PY) diagnose.py
+
+# Diagnose produced results instead of code (grounding + recompute audit).
+.PHONY: diagnose-outputs
+diagnose-outputs:
+	$(PY) diagnose.py --outputs results
+
 # T1 (added next): frozen decoder session1 -> session2 drift chart.
 .PHONY: t1
 t1:
