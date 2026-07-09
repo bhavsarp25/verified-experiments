@@ -25,6 +25,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -239,6 +240,54 @@ def render_failed_test(node_id: str) -> str:
     )
 
 
+def structured_finding(f: reviewer.Finding) -> dict:
+    """Build the JSON finding dict for one reviewer Finding (ERROR or WARN)."""
+    diag = REVIEWER_DIAGNOSES.get(f.code, UNKNOWN_CODE_DIAG)
+    guard = CODE_TO_GUARD.get(f.code, "G?")
+    return {
+        "guard": guard,
+        "code": f.code,
+        "path": f.path,
+        "line": f.line,
+        "severity": f.severity,
+        "what": diag.plain,
+        "cause": diag.likely_cause,
+        "fix": diag.action,
+        "detail": f.message,
+    }
+
+
+def structured_failed_test(node_id: str) -> dict:
+    """Build the JSON finding dict for one failing guard meta-test node."""
+    guard, diag = diagnose_failed_test(node_id)
+    return {
+        "guard": guard,
+        "code": "GUARD_TEST",
+        "path": node_id,
+        "line": 0,
+        "severity": "TEST",
+        "what": diag.plain,
+        "cause": diag.likely_cause,
+        "fix": diag.action,
+        "detail": "",
+    }
+
+
+def structured_pytest_unparsed() -> dict:
+    """Build the JSON finding dict for the unparsed-pytest case."""
+    return {
+        "guard": "G8",
+        "code": "PYTEST_UNPARSED",
+        "path": "pytest",
+        "line": 0,
+        "severity": "TEST",
+        "what": PYTEST_UNPARSED_DIAG.plain,
+        "cause": PYTEST_UNPARSED_DIAG.likely_cause,
+        "fix": PYTEST_UNPARSED_DIAG.action,
+        "detail": "",
+    }
+
+
 @dataclass
 class StatusReport:
     status: str
@@ -246,9 +295,23 @@ class StatusReport:
     attempted: list[str]
     recommendation: str
     diagnoses: list[str] = field(default_factory=list)
+    structured: list[dict] = field(default_factory=list)
 
     def exit_code(self) -> int:
         return _EXIT_FOR_STATUS[self.status]
+
+    def to_json_dict(self) -> dict:
+        """Render the report as the structured JSON contract (schema stable
+        across phases). One findings entry per reviewer Finding and per failing
+        guard meta-test, built from the same structured list the text uses."""
+        return {
+            "status": self.status,
+            "reason": self.reason,
+            "attempted": list(self.attempted),
+            "recommendation": self.recommendation,
+            "exit_code": self.exit_code(),
+            "findings": [dict(f) for f in self.structured],
+        }
 
     def render(self) -> str:
         bar = "=" * 64
@@ -293,6 +356,13 @@ def build_report(
     diagnoses += [render_failed_test(t) for t in failed_tests]
     diagnoses += [render_finding(f) for f in warns]
 
+    # Structured findings, built in parallel and in the same order as the text
+    # diagnoses so JSON and text come from one set of inputs.
+    structured: list[dict] = []
+    structured += [structured_finding(f) for f in errors if f.code != "NO_RESULTS_DIR"]
+    structured += [structured_failed_test(t) for t in failed_tests]
+    structured += [structured_finding(f) for f in warns]
+
     tests_failed_unparsed = tests_ran and pytest_rc != 0 and not failed_tests
 
     if needs_context is not None:
@@ -309,6 +379,7 @@ def build_report(
                 f"    cause:  {PYTEST_UNPARSED_DIAG.likely_cause}\n"
                 f"    fix:    {PYTEST_UNPARSED_DIAG.action}"
             )
+            structured.append(structured_pytest_unparsed())
         reason = (
             f"{len(errors)} reviewer error(s) and "
             f"{len(failed_tests)} failing guard test(s) block the pipeline."
@@ -328,7 +399,7 @@ def build_report(
         reason = "G9 reviewer is clean and all G8 guard meta-tests pass."
         recommendation = "Safe to proceed. Re-run `make diagnose` after the next change."
 
-    return StatusReport(status, reason, attempted, recommendation, diagnoses)
+    return StatusReport(status, reason, attempted, recommendation, diagnoses, structured)
 
 
 def _run_pytest(harness_dir: str) -> tuple[int, str]:
@@ -355,6 +426,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--outputs", help="audit produced result files in this dir instead of reviewing code")
     ap.add_argument("--exclude", nargs="*", default=("tests", "fixtures", "reviewer.py"))
     ap.add_argument("--no-tests", action="store_true", help="skip the G8 guard meta-tests")
+    ap.add_argument("--json", action="store_true",
+                    help="emit one structured JSON object instead of the text report")
     args = ap.parse_args(argv)
 
     harness_dir = os.path.dirname(os.path.abspath(__file__))
@@ -363,7 +436,10 @@ def main(argv: list[str] | None = None) -> int:
         findings = reviewer.audit_outputs(args.outputs)
         attempted = [f"Audited produced results in '{args.outputs}' (G1/G5/G7)."]
         report = build_report(findings, [], tests_ran=False, pytest_rc=0, attempted=attempted)
-        print(report.render())
+        if args.json:
+            print(json.dumps(report.to_json_dict(), indent=2))
+        else:
+            print(report.render())
         return report.exit_code()
 
     attempted = [f"Ran the G9 static reviewer over: {', '.join(args.paths)}."]
@@ -382,7 +458,10 @@ def main(argv: list[str] | None = None) -> int:
     report = build_report(
         findings, failed_tests, tests_ran=tests_ran, pytest_rc=pytest_rc, attempted=attempted
     )
-    print(report.render())
+    if args.json:
+        print(json.dumps(report.to_json_dict(), indent=2))
+    else:
+        print(report.render())
     return report.exit_code()
 
 
