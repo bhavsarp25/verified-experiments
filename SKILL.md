@@ -133,11 +133,13 @@ The full loop lives in `agent/`:
   a writable file only, re-runs, and enforces the tamper gate and a run budget
   every iteration. Terminal outcomes: DONE, NEEDS_CONTEXT, STOPPED_BY_HUMAN,
   BLOCKED_BY_FENCE, TAMPER, ESCALATED.
-- `agent/run.py`: the human CLI entry. Wiring the live edit step to a model (the
-  SDK fixer) is the one remaining piece, deferred to phase 3b; the loop, fence,
-  budget, and checkpoint are done and tested end to end.
+- `agent/sdk_fixer.py`: the live model-driven fixer. The model is bounded by the
+  same fence, enforced at the tool layer by a PreToolUse hook plus `can_use_tool`
+  (never by an allow-list, which would silently shadow the callback). It fails
+  loud if it makes no edit, so a no-op is never mistaken for a fix.
+- `agent/run.py`: the human CLI entry, wiring diagnose + checkpoint + fixer.
 
-Run it with `make agent`. See [docs/agentic-scope.md](docs/agentic-scope.md) for
+Needs `pip install claude-agent-sdk`. Run it with `make agent`. See [docs/agentic-scope.md](docs/agentic-scope.md) for
 the design and remaining work. You can still use the manual investigate loop
 above at any time.
 

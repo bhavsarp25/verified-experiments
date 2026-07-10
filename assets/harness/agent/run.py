@@ -2,12 +2,13 @@
 
 The human entry point for the checkpoint-mode fix loop.
 
-This wires the real diagnose (via subprocess) and a stdin-driven human
-checkpoint into loop.run_loop. The fixer is deliberately NOT wired to a live
-model here: the Claude Agent SDK binding is Phase 3b. Until then the fixer
-placeholder raises with a clear message rather than pretending to fix anything,
-so a run that reaches the edit step fails loud instead of silently doing
-nothing.
+This wires the real diagnose (via subprocess), a stdin-driven human checkpoint,
+and the live model-driven fixer (agent/sdk_fixer.py) into loop.run_loop.
+
+The fixer is bounded by the same fence as everything else: every tool call it
+makes is checked by permissions.check_tool before it happens, and run_loop still
+runs the tamper meta-gate after each edit. If the SDK is not installed, the run
+fails loud rather than silently skipping the edit.
 
 Importing this module has no side effects; the loop only runs from main().
 """
@@ -21,16 +22,7 @@ from loop import (
     diagnose_via_subprocess,
     run_loop,
 )
-
-
-def sdk_fixer_not_wired(finding, root: str) -> None:
-    """The real fixer is a live Claude Agent SDK adapter, wired in Phase 3b. It
-    is not available yet, so we refuse loudly instead of skipping the edit."""
-    raise NotImplementedError(
-        "the live SDK fixer is not wired yet; Phase 3b. "
-        f"Would have fixed {finding.guard or '?'} {finding.code or '?'} in {finding.path}. "
-        "Run with an injected fixer_fn to exercise the loop before then."
-    )
+from sdk_fixer import sdk_fixer
 
 
 def stdin_checkpoint(plan: Plan) -> bool:
@@ -48,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     result = run_loop(
         root,
         diagnose_fn=diagnose_via_subprocess,
-        fixer_fn=sdk_fixer_not_wired,
+        fixer_fn=sdk_fixer,
         checkpoint_fn=stdin_checkpoint,
     )
     print(result.render())
