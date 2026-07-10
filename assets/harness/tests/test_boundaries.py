@@ -205,6 +205,19 @@ def test_hook_denies_dangerous_bash(tmp_path):
         assert not permissions.check_tool("Bash", {"command": cmd}, root=root).allow, cmd
 
 
+def test_bash_allowlist_matches_at_a_token_boundary(tmp_path):
+    """Regression: a raw prefix match let `git difftool` (via `git diff`),
+    `lsof` (via `ls`), and `make gaterm` (via `make gate`) through. `difftool`
+    can launch an external program, so this is a real bypass."""
+    root = _fake_harness(tmp_path)
+    def allow(cmd):
+        return permissions.check_tool("Bash", {"command": cmd}, root=root).allow
+    for cmd in ("git difftool", "lsof /etc", "make gaterm", "make gateway", "catx"):
+        assert not allow(cmd), cmd
+    for cmd in ("make gate", "make diagnose", "git diff HEAD", "git diff", "python diagnose.py"):
+        assert allow(cmd), cmd
+
+
 def test_hook_allows_read_tools(tmp_path):
     root = _fake_harness(tmp_path)
     assert permissions.check_tool("Read", {"file_path": "guards/leakage.py"}, root=root).allow

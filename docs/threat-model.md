@@ -75,9 +75,13 @@ sandbox.**
 - **The revert depends on git.** `revert_protected` restores from `HEAD`. It
   needs a committed, clean baseline. On a dirty tree it will revert your
   uncommitted changes to protected files too. Commit before you run the agent.
-- **The bash allowlist is a prefix match plus a blocked-operator list.** It
-  rejects redirects, pipes, chaining, subshells, and backticks. It is
-  intentionally small. Widening it is the easiest way to reintroduce a hole.
+- **The bash allowlist is a token-boundary match plus a blocked-operator list.**
+  A command is allowed only if it equals an allowed entry or is that entry
+  followed by whitespace, so `git difftool` does not slip through `git diff`. It
+  rejects redirects, pipes, chaining, subshells, and backticks. It does not
+  include `cat` or `ls`; file reading goes through the Read, Grep, and Glob
+  tools. It is intentionally small. Widening it is the easiest way to
+  reintroduce a hole.
 - **G9 is a static AST reviewer.** It catches the patterns it knows
   (hardcoded metric literals, silent excepts, synthetic loaders, fabricated
   fallbacks). It is a tripwire for the common failure modes, not a proof of

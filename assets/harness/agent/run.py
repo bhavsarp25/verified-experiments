@@ -33,9 +33,31 @@ def stdin_checkpoint(plan: Plan) -> bool:
     return answer in ("y", "yes")
 
 
+def preflight(root: str) -> str | None:
+    """Refuse to start if protected files already have uncommitted changes.
+
+    The tamper meta-gate reverts protected files from HEAD. If the baseline is
+    dirty, a TAMPER abort would discard the user's own uncommitted work along
+    with anything the agent touched. Return a refusal reason, or None if clean."""
+    report = boundaries.changed_protected(root)
+    if report.clean:
+        return None
+    return (
+        "refusing to run: protected files have uncommitted changes:\n"
+        + "\n".join(f"  {p}" for p in report.changed)
+        + "\nCommit or stash them first. The tamper gate reverts from HEAD and "
+        "would discard these."
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     root = args[0] if args else boundaries.harness_root()
+
+    refusal = preflight(root)
+    if refusal is not None:
+        print(refusal)
+        return 2
 
     result = run_loop(
         root,

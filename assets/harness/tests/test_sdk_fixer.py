@@ -10,6 +10,11 @@ import subprocess
 
 import pytest
 
+# The live fixer is optional: it needs the Claude Agent SDK. A fresh clone that
+# installs only requirements.txt (numpy, pytest) skips these cleanly instead of
+# erroring. CI installs the SDK so these run for real.
+pytest.importorskip("claude_agent_sdk")
+
 import loop
 import sdk_fixer
 

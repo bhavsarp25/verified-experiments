@@ -30,24 +30,25 @@ WRITE_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
 # Read-only tools the agent may always use.
 READ_TOOLS = frozenset({"Read", "Grep", "Glob"})
 
-# Bash is allowed only when the command starts with one of these. Every entry
-# is read-only or a make target the harness defines.
+# Bash is allowed only for these exact commands, matched at a TOKEN boundary:
+# the command must equal the entry or be followed by whitespace. A plain prefix
+# match would allow `git difftool` (via `git diff`), `lsof` (via `ls`), and
+# `make gaterm` (via `make gate`). `difftool` can launch an external program, so
+# this is not cosmetic.
 #
-# `pytest` is deliberately NOT here. The agent may write into pipeline/, and a
-# bare `pytest` (or `pytest pipeline`) would import and execute a
-# pipeline/conftest.py or pipeline/test_*.py the agent just wrote. That is
-# arbitrary code execution around this fence. The agent runs tests through
-# `make gate`, whose target and pytest.ini are both protected and scope
-# collection to tests/.
-ALLOWED_BASH_PREFIXES: tuple[str, ...] = (
+# The list is intentionally tiny. File reading goes through the Read, Grep, and
+# Glob tools, so `cat` and `ls` are not here. `pytest` is not here either: the
+# agent may write pipeline/, and a bare `pytest` would import and execute a
+# pipeline/conftest.py or pipeline/test_*.py it just wrote, which is arbitrary
+# code execution around this fence. Tests run only through `make gate`, whose
+# target and pytest.ini are both protected and scope collection to tests/.
+ALLOWED_BASH_COMMANDS: tuple[str, ...] = (
     "make gate",
     "make audit",
     "make diagnose",
     "python diagnose.py",
     "git status",
     "git diff",
-    "ls",
-    "cat ",
 )
 
 # Shell operators that could redirect, chain, or hide a write. Any of these in
@@ -80,8 +81,12 @@ def _check_bash(command: str) -> PermissionResult:
     for token in BLOCKED_BASH_TOKENS:
         if token in command:
             return PermissionResult(False, f"bash command uses a blocked operator '{token}': {command}")
-    if any(stripped.startswith(prefix) for prefix in ALLOWED_BASH_PREFIXES):
-        return PermissionResult(True, f"allowed read-only or make command: {stripped}")
+    # Token-boundary match: the command must BE an allowed entry or be that
+    # entry followed by whitespace. A raw prefix match would let `git difftool`
+    # through via `git diff`, `lsof` via `ls`, and `make gaterm` via `make gate`.
+    for allowed in ALLOWED_BASH_COMMANDS:
+        if stripped == allowed or stripped.startswith(allowed + " "):
+            return PermissionResult(True, f"allowed read-only or make command: {stripped}")
     return PermissionResult(False, f"bash command not on the allowlist: {stripped}")
 
 

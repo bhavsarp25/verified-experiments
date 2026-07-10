@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --upgrade pip -r requirements.txt
 
+      - name: Install the Agent SDK (so the fixer's fence tests run, not skip)
+        run: python -m pip install claude-agent-sdk
+
       - name: Gate (G9 reviewer + all guard meta-tests)
         working-directory: assets/harness
         run: make gate PY=python
