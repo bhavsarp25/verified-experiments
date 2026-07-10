@@ -61,6 +61,25 @@ Clone this repo into `~/.claude/skills/verified-experiments/`. It triggers when
 you ask to verify an experiment, gate an ML pipeline, add provenance/audit to
 metrics, or make sure results are not faked.
 
+## Agentic mode
+
+There is an optional loop where an agent runs the guards, reads the diagnosis,
+and fixes its own fakes. The guards are the enforced boundary: the agent may
+write only pipeline code, and can never edit a guard, a test, the reviewer, or
+the diagnoser to make the gate pass. The only way to green is fixing real code.
+
+```bash
+pip install claude-agent-sdk
+make agent      # checkpoint loop: proposes each fix, asks before editing
+```
+
+Enforcement is at the tool layer (a PreToolUse hook plus can_use_tool), backed
+by a git tamper meta-gate that reverts any change to a protected file. Read
+[docs/agentic-scope.md](docs/agentic-scope.md) for the design and
+[docs/threat-model.md](docs/threat-model.md) for what the fence does and does
+not guarantee. Short version: it bounds tool calls, it is not a sandbox, so run
+an untrusted agent's pipeline in a container.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

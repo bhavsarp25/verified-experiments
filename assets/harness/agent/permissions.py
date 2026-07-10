@@ -32,13 +32,18 @@ READ_TOOLS = frozenset({"Read", "Grep", "Glob"})
 
 # Bash is allowed only when the command starts with one of these. Every entry
 # is read-only or a make target the harness defines.
+#
+# `pytest` is deliberately NOT here. The agent may write into pipeline/, and a
+# bare `pytest` (or `pytest pipeline`) would import and execute a
+# pipeline/conftest.py or pipeline/test_*.py the agent just wrote. That is
+# arbitrary code execution around this fence. The agent runs tests through
+# `make gate`, whose target and pytest.ini are both protected and scope
+# collection to tests/.
 ALLOWED_BASH_PREFIXES: tuple[str, ...] = (
     "make gate",
     "make audit",
     "make diagnose",
     "python diagnose.py",
-    "python -m pytest",
-    "pytest",
     "git status",
     "git diff",
     "ls",

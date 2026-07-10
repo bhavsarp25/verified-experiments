@@ -39,6 +39,7 @@ PROTECTED: tuple[str, ...] = (
     "diagnose.py",
     "conftest.py",
     "Makefile",
+    "pytest.ini",
     "agent/boundaries.py",
     "agent/permissions.py",
     "agent/contract.md",

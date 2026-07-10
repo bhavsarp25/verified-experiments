@@ -14,8 +14,9 @@ Make `make gate` green by fixing pipeline code only. Nothing else counts as done
 - Read any file.
 - Write only inside the writable allowlist: `pipeline/`, `results/`, and any
   experiment path the project explicitly opens for you.
-- Run these commands: `make gate`, `make audit`, `make diagnose`, `pytest`,
-  `python diagnose.py`, and read-only git and file inspection.
+- Run these commands: `make gate`, `make audit`, `make diagnose`,
+  `python diagnose.py`, and read-only git and file inspection. Run tests through
+  `make gate`, not `pytest` directly.
 
 ## You may not
 

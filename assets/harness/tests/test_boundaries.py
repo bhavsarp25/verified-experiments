@@ -7,6 +7,7 @@ fixing real pipeline code, never editing the harness that judges it. If one of
 these fails, fix the fence, not the test."""
 import os
 import subprocess
+import sys
 
 import boundaries
 import permissions
@@ -121,6 +122,17 @@ def test_build_artifacts_are_not_tamper(tmp_path):
     assert boundaries.changed_protected(root).clean
 
 
+def test_artifact_filter_is_not_a_write_channel(tmp_path):
+    """The artifact filter relaxes tamper REPORTING only. Writing a .pyc under a
+    protected dir must still be denied, otherwise a crafted bytecode file could
+    shadow a guard without ever tripping the meta-gate."""
+    root = _fake_harness(tmp_path)
+    for p in ("guards/__pycache__/leakage.cpython-314.pyc", "guards/stray.pyc",
+              "tests/__pycache__/x.pyc"):
+        assert not boundaries.classify(root, p).allow, p
+        assert not permissions.check_tool("Write", {"file_path": p}, root=root).allow, p
+
+
 def test_revert_restores_a_tampered_guard(tmp_path):
     root = _fake_harness(tmp_path)
     guard = os.path.join(root, "guards", "leakage.py")
@@ -181,8 +193,9 @@ def test_hook_denies_write_to_guard(tmp_path):
 
 
 def test_hook_allows_make_targets(tmp_path):
+    """Note: bare pytest is deliberately absent. See test_bare_pytest_is_not_allowed."""
     root = _fake_harness(tmp_path)
-    for cmd in ("make gate", "make diagnose", "python -m pytest -q", "git status"):
+    for cmd in ("make gate", "make diagnose", "make audit", "python diagnose.py", "git status"):
         assert permissions.check_tool("Bash", {"command": cmd}, root=root).allow, cmd
 
 
@@ -200,3 +213,43 @@ def test_hook_allows_read_tools(tmp_path):
 def test_hook_denies_unknown_tool(tmp_path):
     root = _fake_harness(tmp_path)
     assert not permissions.check_tool("WebFetch", {"url": "http://x"}, root=root).allow
+
+
+# --- code-execution escape via pytest collection ----------------------------
+
+def test_bare_pytest_is_not_allowed(tmp_path):
+    """Regression: the agent may write pipeline/. A fence-allowed `pytest` would
+    import and execute pipeline/conftest.py or pipeline/test_*.py, which is
+    arbitrary code execution around this fence. Tests run via `make gate` only."""
+    root = _fake_harness(tmp_path)
+    for cmd in ("pytest", "pytest pipeline", "python -m pytest", "python -m pytest pipeline"):
+        assert not permissions.check_tool("Bash", {"command": cmd}, root=root).allow, cmd
+
+
+def test_pytest_collection_is_scoped_to_tests(tmp_path):
+    """pytest.ini must stop collection from reaching agent-writable pipeline/.
+    Proven by running a real collection, not by reading the config."""
+    proj = tmp_path / "proj"
+    (proj / "tests").mkdir(parents=True)
+    (proj / "pipeline").mkdir()
+    (proj / "pytest.ini").write_text("[pytest]\ntestpaths = tests\nnorecursedirs = pipeline\n")
+    (proj / "tests" / "test_real.py").write_text("def test_ok():\n    assert True\n")
+    # If pipeline/ were collected, importing this would raise at collection time.
+    (proj / "pipeline" / "test_evil.py").write_text("raise SystemExit('pipeline was executed')\n")
+    (proj / "pipeline" / "conftest.py").write_text("raise SystemExit('pipeline conftest ran')\n")
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "--collect-only"],
+        cwd=proj, capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, f"collection failed, pipeline may have executed:\n{proc.stdout}{proc.stderr}"
+    assert "test_real" in proc.stdout
+    assert "test_evil" not in proc.stdout
+    assert "pipeline was executed" not in (proc.stdout + proc.stderr)
+    assert "pipeline conftest ran" not in (proc.stdout + proc.stderr)
+
+
+def test_pytest_ini_is_protected(tmp_path):
+    """If the agent could edit pytest.ini it could re-open collection."""
+    root = _fake_harness(tmp_path)
+    assert not boundaries.classify(root, "pytest.ini").allow

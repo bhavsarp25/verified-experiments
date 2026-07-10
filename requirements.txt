@@ -1,0 +1,6 @@
+# Harness runtime. Deliberately tiny: the guards must be auditable.
+numpy>=1.24
+pytest>=7.0
+
+# Agentic mode only (agent/sdk_fixer.py). Not needed for the guards or the gate.
+# pip install claude-agent-sdk

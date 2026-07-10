@@ -407,7 +407,7 @@ def _run_pytest(harness_dir: str) -> tuple[int, str]:
     Subprocess so a diagnoser run never nests inside the pytest session it
     reports on. Uses check=False so we inspect the code instead of raising."""
     proc = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q"],
+        [sys.executable, "-m", "pytest", "-q", "tests"],
         cwd=harness_dir, capture_output=True, text=True,
     )
     return proc.returncode, proc.stdout + proc.stderr

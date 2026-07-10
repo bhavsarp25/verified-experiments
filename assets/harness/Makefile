@@ -15,7 +15,7 @@ review:
 # G8 guard meta-tests (each guard must reject a deliberate fake).
 .PHONY: test
 test:
-	$(PY) -m pytest -q
+	$(PY) -m pytest -q tests
 
 # Post-output audit: every result must be grounded + recomputable.
 .PHONY: audit

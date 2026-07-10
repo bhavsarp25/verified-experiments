@@ -1,0 +1,55 @@
+name: gate
+
+# The harness must pass its own gate on every push. A repo that claims results
+# cannot be faked, and does not run its own guards in CI, is asking for trust it
+# has not earned.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip -r requirements.txt
+
+      - name: Gate (G9 reviewer + all guard meta-tests)
+        working-directory: assets/harness
+        run: make gate PY=python
+
+      - name: Diagnose (must report DONE)
+        working-directory: assets/harness
+        run: make diagnose PY=python
+
+      - name: Reviewer must still catch every planted fake
+        working-directory: assets/harness
+        # fixtures_bad.py is deliberately fraudulent. If the reviewer stops
+        # flagging it, the reviewer is broken and CI must fail. We call
+        # review_source directly because the CLI excludes tests/ and fixtures/
+        # by design.
+        run: |
+          python - <<'PY'
+          import sys
+          import reviewer
+          findings = reviewer.review_source("tests/fixtures_bad.py")
+          codes = {f.code for f in findings}
+          expected = {"HARDCODED_METRIC", "SILENT_EXCEPT", "FABRICATED_FALLBACK", "SYNTHETIC_LOADER"}
+          missing = expected - codes
+          if missing:
+              print(f"reviewer stopped flagging: {sorted(missing)}")
+              sys.exit(1)
+          print(f"reviewer flagged every planted fake: {sorted(codes)}")
+          PY
